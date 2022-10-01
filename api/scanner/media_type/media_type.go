@@ -119,6 +119,10 @@ var RawMimeTypes = [...]MediaType{
 	TypeSRW,
 }
 
+var DngMimeTypes = [...]MediaType{
+	TypeDNG,
+}
+
 var VideoMimetypes = [...]MediaType{
 	TypeMP4,
 	TypeMPEG,
@@ -204,6 +208,16 @@ var fileExtensions = map[string]MediaType{
 func (imgType *MediaType) IsRaw() bool {
 	for _, raw_mime := range RawMimeTypes {
 		if raw_mime == *imgType {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (imgType *MediaType) IsDng() bool {
+	for _, dng_mime := range DngMimeTypes {
+		if dng_mime == *imgType {
 			return true
 		}
 	}

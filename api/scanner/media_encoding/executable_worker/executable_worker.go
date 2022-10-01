@@ -16,10 +16,12 @@ import (
 func InitializeExecutableWorkers() {
 	DarktableCli = newDarktableWorker()
 	FfmpegCli = newFfmpegWorker()
+	Magick = newMagickWorker()
 }
 
 var DarktableCli *DarktableWorker = nil
 var FfmpegCli *FfmpegWorker = nil
+var Magick *MagickWorker = nil
 
 type ExecutableWorker interface {
 	Path() string
@@ -30,6 +32,10 @@ type DarktableWorker struct {
 }
 
 type FfmpegWorker struct {
+	path string
+}
+
+type MagickWorker struct {
 	path string
 }
 
@@ -85,11 +91,41 @@ func newFfmpegWorker() *FfmpegWorker {
 	return nil
 }
 
+func newMagickWorker() *MagickWorker {
+	if utils.EnvDisableRawProcessing.GetBool() {
+		log.Printf("Executable worker disabled (%s=1): magick\n", utils.EnvDisableRawProcessing.GetName())
+		return nil
+	}
+
+	path, err := exec.LookPath("magick")
+	if err != nil {
+		log.Println("Executable worker not found: magick")
+	} else {
+		version, err := exec.Command(path, "-version").Output()
+		if err != nil {
+			log.Printf("Error getting version of magick: %s\n", err)
+			return nil
+		}
+
+		log.Printf("Found executable worker: magick (%s)\n", strings.Split(string(version), "\n")[0])
+
+		return &MagickWorker{
+			path: path,
+		}
+	}
+
+	return nil
+}
+
 func (worker *DarktableWorker) IsInstalled() bool {
 	return worker != nil
 }
 
 func (worker *FfmpegWorker) IsInstalled() bool {
+	return worker != nil
+}
+
+func (worker *MagickWorker) IsInstalled() bool {
 	return worker != nil
 }
 
@@ -108,6 +144,27 @@ func (worker *DarktableWorker) EncodeJpeg(inputPath string, outputPath string, j
 		fmt.Sprintf("plugins/imageio/format/jpeg/quality=%d", jpegQuality),
 		"--configdir",
 		tmpDir,
+	}
+
+	cmd := exec.Command(worker.path, args...)
+
+	if err := cmd.Run(); err != nil {
+		return errors.Wrapf(err, "encoding image using: %s %v", worker.path, args)
+	}
+
+	return nil
+}
+
+func (worker *MagickWorker) EncodeJpegDNG(inputPath string, outputPath string) error {
+	tmpDir, err := ioutil.TempDir("/tmp", "photoview-magick")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	args := []string{
+		inputPath,
+		outputPath,
 	}
 
 	cmd := exec.Command(worker.path, args...)
